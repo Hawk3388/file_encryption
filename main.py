@@ -1,35 +1,92 @@
 #!/usr/bin/env python3
 """
 File Encryption Script
-Encrypts a file using another file as key with XOR encryption.
+Encrypts a file using another file as key with AES-256 encryption.
+Uses AES-256 in CBC mode with PKCS7 padding for secure encryption.
 """
 
 import os
 import sys
 import argparse
+import hashlib
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
 
-def xor_encrypt_decrypt(data: bytes, key: bytes) -> bytes:
+def derive_key_from_file(key_file_data: bytes) -> bytes:
     """
-    Encrypts/Decrypts data using XOR encryption.
+    Derives a 256-bit AES key from key file data using SHA-256.
     
     Args:
-        data: The data to be encrypted/decrypted
-        key: The key for encryption
+        key_file_data: The raw key file data
+        
+    Returns:
+        32-byte AES key
+    """
+    if not key_file_data:
+        raise ValueError("Key file cannot be empty")
+    
+    # Use SHA-256 to derive a consistent 32-byte key from any size key file
+    return hashlib.sha256(key_file_data).digest()
+
+
+def aes_encrypt(data: bytes, key: bytes) -> bytes:
+    """
+    Encrypts data using AES-256 in CBC mode.
+    
+    Args:
+        data: The data to be encrypted
+        key: 32-byte AES key
     
     Returns:
-        The encrypted/decrypted data
+        IV (16 bytes) + encrypted data
     """
-    if not key:
-        raise ValueError("Key cannot be empty")
+    # Generate random IV
+    iv = os.urandom(16)
     
-    result = bytearray()
-    key_length = len(key)
+    # Pad data to 16-byte blocks
+    padder = padding.PKCS7(128).padder()
+    padded_data = padder.update(data)
+    padded_data += padder.finalize()
     
-    for i, byte in enumerate(data):
-        # XOR with corresponding key byte (key repetition)
-        result.append(byte ^ key[i % key_length])
+    # Encrypt
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+    encrypted_data = encryptor.update(padded_data) + encryptor.finalize()
     
-    return bytes(result)
+    # Return IV + encrypted data
+    return iv + encrypted_data
+
+
+def aes_decrypt(encrypted_data: bytes, key: bytes) -> bytes:
+    """
+    Decrypts data using AES-256 in CBC mode.
+    
+    Args:
+        encrypted_data: IV (16 bytes) + encrypted data
+        key: 32-byte AES key
+    
+    Returns:
+        The decrypted data
+    """
+    if len(encrypted_data) < 16:
+        raise ValueError("Invalid encrypted data - too short")
+    
+    # Extract IV and encrypted data
+    iv = encrypted_data[:16]
+    ciphertext = encrypted_data[16:]
+    
+    # Decrypt
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    padded_data = decryptor.update(ciphertext) + decryptor.finalize()
+    
+    # Remove padding
+    unpadder = padding.PKCS7(128).unpadder()
+    data = unpadder.update(padded_data)
+    data += unpadder.finalize()
+    
+    return data
 
 
 def detect_file_type(data: bytes) -> str:
@@ -222,7 +279,9 @@ def encrypt_file(input_file: str, key_file: str, output_file: str, overwrite: bo
         sys.exit(1)
     
     print("Encrypting data...")
-    encrypted_data = xor_encrypt_decrypt(data, key)
+    # Derive AES key from key file
+    aes_key = derive_key_from_file(key)
+    encrypted_data = aes_encrypt(data, aes_key)
     
     # Ensure encrypted file has .fe extension
     base_name = os.path.splitext(output_file)[0]
@@ -262,7 +321,9 @@ def decrypt_file(input_file: str, key_file: str, output_file: str, overwrite: bo
         sys.exit(1)
     
     print("Decrypting data...")
-    decrypted_data = xor_encrypt_decrypt(encrypted_data, key)
+    # Derive AES key from key file
+    aes_key = derive_key_from_file(key)
+    decrypted_data = aes_decrypt(encrypted_data, aes_key)
     
     # Auto-detect correct file extension if enabled
     if auto_ext:
@@ -331,8 +392,12 @@ Note: Encrypted files are automatically saved with .fe extension
     
     # Check if input files exist
     if not os.path.exists(args.input_file):
-        print(f"Error: Input file '{args.input_file}' not found.")
-        sys.exit(1)
+        if args.mode in ['decrypt', 'dec'] and os.path.exists(args.input_file + '.fe'):
+            print(f"Found encrypted input file '{args.input_file}.fe'.")
+            args.input_file += '.fe'
+        else:
+            print(f"Error: Input file '{args.input_file}' not found.")
+            sys.exit(1)
     
     if not os.path.exists(args.key_file):
         print(f"Error: Key file '{args.key_file}' not found.")

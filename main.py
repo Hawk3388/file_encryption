@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 File Encryption Script
 Encrypts a file using another file as key with AES-256 encryption.
@@ -29,7 +28,6 @@ def derive_key_from_file(key_file_data: bytes) -> bytes:
     # Use SHA-256 to derive a consistent 32-byte key from any size key file
     return hashlib.sha256(key_file_data).digest()
 
-
 def aes_encrypt(data: bytes, key: bytes) -> bytes:
     """
     Encrypts data using AES-256 in CBC mode.
@@ -56,7 +54,6 @@ def aes_encrypt(data: bytes, key: bytes) -> bytes:
     
     # Return IV + encrypted data
     return iv + encrypted_data
-
 
 def aes_decrypt(encrypted_data: bytes, key: bytes) -> bytes:
     """
@@ -87,7 +84,6 @@ def aes_decrypt(encrypted_data: bytes, key: bytes) -> bytes:
     data += unpadder.finalize()
     
     return data
-
 
 def detect_file_type(data: bytes) -> str:
     """
@@ -179,7 +175,6 @@ def detect_file_type(data: bytes) -> str:
     # Default: no extension if type cannot be determined
     return ''
 
-
 def auto_detect_extension(output_file: str, decrypted_data: bytes) -> str:
     """
     Automatically adds the correct extension to output file based on content.
@@ -206,7 +201,6 @@ def auto_detect_extension(output_file: str, decrypted_data: bytes) -> str:
         print("Could not detect file type - using original filename")
         return output_file
 
-
 def read_file(file_path: str) -> bytes:
     """
     Reads a file and returns the content as bytes.
@@ -229,7 +223,6 @@ def read_file(file_path: str) -> bytes:
     except Exception as e:
         print(f"Error reading file '{file_path}': {e}")
         sys.exit(1)
-
 
 def write_file(file_path: str, data: bytes, overwrite: bool = False) -> None:
     """
@@ -256,7 +249,6 @@ def write_file(file_path: str, data: bytes, overwrite: bool = False) -> None:
     except Exception as e:
         print(f"Error writing file '{file_path}': {e}")
         sys.exit(1)
-
 
 def encrypt_file(input_file: str, key_file: str, output_file: str, overwrite: bool = False) -> None:
     """
@@ -298,7 +290,6 @@ def encrypt_file(input_file: str, key_file: str, output_file: str, overwrite: bo
     print(f"Key file: {key_file} ({len(key)} bytes)")
     print(f"Output file: {encrypted_output_file} ({len(encrypted_data)} bytes)")
 
-
 def decrypt_file(input_file: str, key_file: str, output_file: str, overwrite: bool = False, auto_ext: bool = True) -> None:
     """
     Decrypts a file using a key file.
@@ -338,7 +329,6 @@ def decrypt_file(input_file: str, key_file: str, output_file: str, overwrite: bo
     print(f"Input file: {input_file} ({len(encrypted_data)} bytes)")
     print(f"Key file: {key_file} ({len(key)} bytes)")
     print(f"Output file: {corrected_output_file} ({len(decrypted_data)} bytes)")
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -409,7 +399,6 @@ Note: Encrypted files are automatically saved with .fe extension
     else:  # decrypt, dec
         auto_ext = not args.no_auto_ext  # Enable auto-extension unless --no-auto-ext is specified
         decrypt_file(args.input_file, args.key_file, args.output_file, args.overwrite, auto_ext)
-
 
 if __name__ == "__main__":
     main()
